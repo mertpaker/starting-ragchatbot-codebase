@@ -122,10 +122,26 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        // Format sources - handle both string and object formats
+        const formattedSources = sources.map(source => {
+            if (typeof source === 'string') {
+                // Backward compatibility - plain string
+                return source;
+            } else if (source && typeof source === 'object') {
+                // Enhanced source with lesson link
+                if (source.lesson_link) {
+                    return `<a href="${source.lesson_link}" target="_blank" class="source-link">${source.display_text}</a>`;
+                } else {
+                    return source.display_text || source.course_title || 'Unknown source';
+                }
+            }
+            return 'Unknown source';
+        });
+        
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">${formattedSources.join(', ')}</div>
             </details>
         `;
     }

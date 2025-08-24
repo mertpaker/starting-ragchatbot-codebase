@@ -65,6 +65,13 @@ The system uses Claude's tool-calling capability where:
 - The tool executes semantic search in ChromaDB
 - Results are formatted and returned to Claude for synthesis
 
+### Source Citations with Lesson Links
+
+Sources in query responses are enhanced with clickable links:
+- **Backend**: `search_tools.py` returns source objects with lesson metadata including URLs
+- **Frontend**: Sources with lesson links render as clickable `<a>` tags opening in new tabs
+- **Caching**: Update version parameters in `index.html` (`style.css?v=X` and `script.js?v=X`) when making frontend changes to bypass browser cache
+
 ### Configuration (`backend/config.py`)
 
 Key settings:
@@ -80,13 +87,18 @@ Key settings:
 Course documents in `/docs/` should follow this format:
 ```
 Course Title: [Title]
+Course Link: [URL]
 Instructor: [Name]
 
 Lesson [N]: [Topic]
+Lesson Link: [URL]
 [Content...]
 ```
 
-The system automatically extracts course metadata and creates searchable chunks.
+The system automatically:
+- Extracts course metadata and lesson links during document processing
+- Creates searchable chunks with preserved lesson associations
+- Stores lesson URLs for display as clickable source citations
 
 ## Development Notes
 
@@ -101,6 +113,7 @@ The system automatically extracts course metadata and creates searchable chunks.
 ## API Endpoints
 
 - `POST /api/query`: Process user query with optional session_id
+  - Returns enhanced sources with `display_text`, `course_title`, `lesson_number`, and `lesson_link`
 - `GET /api/courses`: Get course statistics and titles
 - `GET /docs`: FastAPI automatic API documentation
 

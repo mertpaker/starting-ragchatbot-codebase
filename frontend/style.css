@@ -248,6 +248,23 @@ header h1 {
     color: var(--text-secondary);
 }
 
+/* Source link styles */
+.source-link {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--accent);
+    transition: all 0.2s ease;
+}
+
+.source-link:hover {
+    color: var(--text-primary);
+    border-bottom-style: solid;
+}
+
+.source-link:visited {
+    color: #9b8ae5;  /* Slightly muted purple for visited links */
+}
+
 /* Markdown formatting styles */
 .message-content h1,
 .message-content h2,
