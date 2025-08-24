@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, Protocol
+from typing import Dict, Any, Optional, Protocol, List
 from abc import ABC, abstractmethod
 from vector_store import VectorStore, SearchResults
 
@@ -147,6 +147,151 @@ class CourseSearchTool(Tool):
         except Exception as e:
             print(f"Error getting course metadata: {e}")
             return {}
+
+class CourseOutlineTool(Tool):
+    """Tool for retrieving course outlines and structure information"""
+    
+    def __init__(self, vector_store: VectorStore):
+        self.store = vector_store
+        self.last_sources = []  # Track sources from last operation
+    
+    def get_tool_definition(self) -> Dict[str, Any]:
+        """Return Anthropic tool definition for this tool"""
+        return {
+            "name": "get_course_outline",
+            "description": "Get structured course outline with lessons, instructor, and links",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string",
+                        "description": "Course title to get outline for (partial matches work). Leave empty to get all courses."
+                    }
+                },
+                "required": []
+            }
+        }
+    
+    def execute(self, course_name: Optional[str] = None) -> str:
+        """
+        Execute the course outline tool.
+        
+        Args:
+            course_name: Optional course name to filter by
+            
+        Returns:
+            Formatted course outline(s) or error message
+        """
+        
+        # Get all courses metadata
+        all_courses = self.store.get_all_courses_metadata()
+        
+        if not all_courses:
+            return "No courses available in the knowledge base."
+        
+        # If course name provided, filter to specific course
+        if course_name:
+            # Use semantic search to find best matching course
+            resolved_title = self.store._resolve_course_name(course_name)
+            if not resolved_title:
+                return f"No course found matching '{course_name}'."
+            
+            # Find the specific course
+            for course in all_courses:
+                if course.get('title') == resolved_title:
+                    return self._format_single_course(course)
+            
+            return f"Course metadata not found for '{resolved_title}'."
+        
+        # Return all courses outline
+        return self._format_all_courses(all_courses)
+    
+    def _format_single_course(self, course: Dict[str, Any]) -> str:
+        """Format a single course outline"""
+        lines = []
+        
+        # Course header
+        title = course.get('title', 'Unknown Course')
+        lines.append(f"## {title}")
+        
+        # Course link
+        if course.get('course_link'):
+            lines.append(f"**Course Link:** {course['course_link']}")
+        
+        # Instructor
+        if course.get('instructor'):
+            lines.append(f"**Instructor:** {course['instructor']}")
+        
+        # Lessons
+        lessons = course.get('lessons', [])
+        if lessons:
+            lines.append("\n**Lessons:**")
+            for lesson in lessons:
+                lesson_num = lesson.get('lesson_number', '?')
+                lesson_title = lesson.get('lesson_title', 'Untitled')
+                lesson_link = lesson.get('lesson_link', '')
+                
+                if lesson_link:
+                    lines.append(f"- Lesson {lesson_num}: [{lesson_title}]({lesson_link})")
+                else:
+                    lines.append(f"- Lesson {lesson_num}: {lesson_title}")
+        else:
+            lines.append("\n*No lessons found for this course.*")
+        
+        # Track this as a source
+        self.last_sources = [{
+            'display_text': title,
+            'course_title': title,
+            'lesson_number': None,
+            'lesson_link': course.get('course_link')
+        }]
+        
+        return "\n".join(lines)
+    
+    def _format_all_courses(self, courses: List[Dict[str, Any]]) -> str:
+        """Format all courses outline"""
+        if not courses:
+            return "No courses available."
+        
+        lines = ["# Available Courses\n"]
+        sources = []
+        
+        for course in courses:
+            title = course.get('title', 'Unknown Course')
+            instructor = course.get('instructor', 'Unknown')
+            lessons = course.get('lessons', [])
+            course_link = course.get('course_link')
+            
+            # Course summary
+            lines.append(f"## {title}")
+            if course_link:
+                lines.append(f"**Link:** {course_link}")
+            lines.append(f"**Instructor:** {instructor}")
+            lines.append(f"**Total Lessons:** {len(lessons)}")
+            
+            # Add to sources
+            sources.append({
+                'display_text': title,
+                'course_title': title,
+                'lesson_number': None,
+                'lesson_link': course_link
+            })
+            
+            # Lesson titles (compact view)
+            if lessons:
+                lesson_titles = [f"L{l.get('lesson_number', '?')}: {l.get('lesson_title', 'Untitled')}" 
+                               for l in lessons[:3]]  # Show first 3 lessons
+                lines.append(f"**Topics:** {', '.join(lesson_titles)}")
+                if len(lessons) > 3:
+                    lines.append(f"*... and {len(lessons) - 3} more lessons*")
+            
+            lines.append("")  # Empty line between courses
+        
+        # Track sources
+        self.last_sources = sources
+        
+        return "\n".join(lines)
+
 
 class ToolManager:
     """Manages available tools for the AI"""
